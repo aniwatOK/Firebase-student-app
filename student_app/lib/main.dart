@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Add this import
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -24,74 +23,75 @@ class _MainAppState extends State<MainApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        body: Center(
-          child: FirestoreData(),
-        ),
-        floatingActionButton: Builder(
-          builder: (BuildContext context) {
-            return FloatingActionButton(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    TextEditingController nameController =
-                        TextEditingController();
-                    TextEditingController studentIdController =
-                        TextEditingController();
-                    return AlertDialog(
-                      title: const Text('Add New Data'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextField(
-                            controller: nameController,
-                            decoration: InputDecoration(
-                                labelText: 'Name',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                )),
-                          ),
-                          TextField(
-                            controller: studentIdController,
-                            decoration: InputDecoration(
-                                labelText: 'Student ID',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                )),
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            var data = {
-                              'name': nameController.text,
-                              'student_id': studentIdController.text,
-                            };
-                            FirebaseFirestore.instance
-                                .collection('students')
-                                .add(data);
-                            Navigator.of(context).pop();
-                            setState(() {});
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-              child: const Icon(Icons.add),
-            );
-          },
+        appBar: AppBar(title: const Text('Student List')),
+        body: const FirestoreData(),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => _showStudentDialog(context),
+          child: const Icon(Icons.add),
         ),
       ),
+    );
+  }
+
+  void _showStudentDialog(BuildContext context, [DocumentSnapshot? student]) {
+    TextEditingController nameController =
+        TextEditingController(text: student?.get('name') ?? '');
+    TextEditingController studentIdController =
+        TextEditingController(text: student?.get('student_id') ?? '');
+    TextEditingController majorController =
+        TextEditingController(text: student?.get('major') ?? '');
+    TextEditingController yearController =
+        TextEditingController(text: student?.get('year') ?? '');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(student == null ? 'Add New Student' : 'Edit Student'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name')),
+              TextField(
+                  controller: studentIdController,
+                  decoration: const InputDecoration(labelText: 'Student ID')),
+              TextField(
+                  controller: majorController,
+                  decoration: const InputDecoration(labelText: 'Major')),
+              TextField(
+                  controller: yearController,
+                  decoration: const InputDecoration(labelText: 'Year')),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                var data = {
+                  'name': nameController.text,
+                  'student_id': studentIdController.text,
+                  'major': majorController.text,
+                  'year': yearController.text,
+                };
+                if (student == null) {
+                  FirebaseFirestore.instance.collection('students').add(data);
+                } else {
+                  FirebaseFirestore.instance
+                      .collection('students')
+                      .doc(student.id)
+                      .update(data);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -101,26 +101,49 @@ class FirestoreData extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: FirebaseFirestore.instance.collection('students').get(),
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance.collection('students').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const CircularProgressIndicator();
+          return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return const Text('Error fetching data');
+          return const Center(child: Text('Error fetching data'));
         }
-        final data = snapshot.data?.docs.map((doc) => doc.data()).toList();
+        final data = snapshot.data?.docs ?? [];
+
         return ListView.builder(
-          itemCount: data?.length ?? 0,
+          itemCount: data.length,
           itemBuilder: (context, index) {
+            var student = data[index];
             return ListTile(
-              title: Text(data?[index]['name'] ?? 'No data'),
-              subtitle: Text(data?[index]['student_id'] ?? 'No data'),
+              title: Text(student['name'] ?? 'No Name'),
+              subtitle: Text(
+                  '${student['student_id']} - ${student['major']} (Year ${student['year']})'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: () => _showStudentDialog(context, student),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => FirebaseFirestore.instance
+                        .collection('students')
+                        .doc(student.id)
+                        .delete(),
+                  ),
+                ],
+              ),
             );
           },
         );
       },
     );
+  }
+
+  void _showStudentDialog(BuildContext context, DocumentSnapshot student) {
+    (_MainAppState())._showStudentDialog(context, student);
   }
 }
