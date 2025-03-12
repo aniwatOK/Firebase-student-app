@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Add this import
+
 import 'firebase_options.dart';
 
 void main() async {
@@ -23,75 +24,96 @@ class _MainAppState extends State<MainApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(title: const Text('Student List')),
-        body: const FirestoreData(),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showStudentDialog(context),
-          child: const Icon(Icons.add),
+        body: Center(
+          child: FirestoreData(),
+        ),
+        floatingActionButton: Builder(
+          builder: (BuildContext context) {
+            return FloatingActionButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    TextEditingController nameController =
+                        TextEditingController();
+                    TextEditingController studentIdController =
+                        TextEditingController();
+                    TextEditingController branchController =
+                        TextEditingController();
+                    TextEditingController yearController =
+                        TextEditingController();
+                    return AlertDialog(
+                      title: const Text('เพิ่มข้อมูลใหม่'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(
+                            controller: nameController,
+                            decoration: InputDecoration(
+                                labelText: 'ชื่อ',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                )),
+                          ),
+                          TextField(
+                            controller: studentIdController,
+                            decoration: InputDecoration(
+                                labelText: 'รหัสนักศึกษา',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                )),
+                          ),
+                          TextField(
+                            controller: branchController,
+                            decoration: InputDecoration(
+                                labelText: 'สาขา',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                )),
+                          ),
+                          TextField(
+                            controller: yearController,
+                            decoration: InputDecoration(
+                                labelText: 'ชั้นปี',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                )),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            var data = {
+                              'name': nameController.text,
+                              'student_id': studentIdController.text,
+                              'branch': branchController.text,
+                              'year': yearController.text,
+                            };
+                            FirebaseFirestore.instance
+                                .collection('students')
+                                .add(data);
+                            Navigator.of(context).pop();
+                            setState(() {});
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+              child: const Icon(Icons.add),
+            );
+          },
         ),
       ),
-    );
-  }
-
-  void _showStudentDialog(BuildContext context, [DocumentSnapshot? student]) {
-    TextEditingController nameController =
-        TextEditingController(text: student?.get('name') ?? '');
-    TextEditingController studentIdController =
-        TextEditingController(text: student?.get('student_id') ?? '');
-    TextEditingController majorController =
-        TextEditingController(text: student?.get('major') ?? '');
-    TextEditingController yearController =
-        TextEditingController(text: student?.get('year') ?? '');
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(student == null ? 'Add New Student' : 'Edit Student'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name')),
-              TextField(
-                  controller: studentIdController,
-                  decoration: const InputDecoration(labelText: 'Student ID')),
-              TextField(
-                  controller: majorController,
-                  decoration: const InputDecoration(labelText: 'Major')),
-              TextField(
-                  controller: yearController,
-                  decoration: const InputDecoration(labelText: 'Year')),
-            ],
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
-            TextButton(
-              onPressed: () {
-                var data = {
-                  'name': nameController.text,
-                  'student_id': studentIdController.text,
-                  'major': majorController.text,
-                  'year': yearController.text,
-                };
-                if (student == null) {
-                  FirebaseFirestore.instance.collection('students').add(data);
-                } else {
-                  FirebaseFirestore.instance
-                      .collection('students')
-                      .doc(student.id)
-                      .update(data);
-                }
-                Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
     );
   }
 }
@@ -105,34 +127,113 @@ class FirestoreData extends StatelessWidget {
       stream: FirebaseFirestore.instance.collection('students').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const CircularProgressIndicator();
         }
         if (snapshot.hasError) {
-          return const Center(child: Text('Error fetching data'));
+          return const Text('Error fetching data');
         }
         final data = snapshot.data?.docs ?? [];
-
         return ListView.builder(
           itemCount: data.length,
           itemBuilder: (context, index) {
             var student = data[index];
             return ListTile(
-              title: Text(student['name'] ?? 'No Name'),
+              title: Text(student['name'] ?? 'No data'),
               subtitle: Text(
-                  '${student['student_id']} - ${student['major']} (Year ${student['year']})'),
+                  'ID: ${student['student_id'] ?? 'No data'}\nBranch: ${student['branch'] ?? 'No data'}\nYear: ${student['year'] ?? 'No data'}'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.blue),
-                    onPressed: () => _showStudentDialog(context, student),
+                    icon: const Icon(Icons.edit),
+                    onPressed: () {
+                      TextEditingController nameController =
+                          TextEditingController(text: student['name']);
+                      TextEditingController studentIdController =
+                          TextEditingController(text: student['student_id']);
+                      TextEditingController branchController =
+                          TextEditingController(text: student['branch']);
+                      TextEditingController yearController =
+                          TextEditingController(text: student['year']);
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('Edit Data'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextField(
+                                  controller: nameController,
+                                  decoration: InputDecoration(
+                                      labelText: 'ชื่อ',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      )),
+                                ),
+                                TextField(
+                                  controller: studentIdController,
+                                  decoration: InputDecoration(
+                                      labelText: 'รหัสนักศึกษา',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      )),
+                                ),
+                                TextField(
+                                  controller: branchController,
+                                  decoration: InputDecoration(
+                                      labelText: 'สาขา',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      )),
+                                ),
+                                TextField(
+                                  controller: yearController,
+                                  decoration: InputDecoration(
+                                      labelText: 'ชั้นปี',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      )),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  var data = {
+                                    'name': nameController.text,
+                                    'student_id': studentIdController.text,
+                                    'branch': branchController.text,
+                                    'year': yearController.text,
+                                  };
+                                  FirebaseFirestore.instance
+                                      .collection('students')
+                                      .doc(student.id)
+                                      .update(data);
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => FirebaseFirestore.instance
-                        .collection('students')
-                        .doc(student.id)
-                        .delete(),
+                    icon: const Icon(Icons.delete),
+                    onPressed: () {
+                      FirebaseFirestore.instance
+                          .collection('students')
+                          .doc(student.id)
+                          .delete();
+                    },
                   ),
                 ],
               ),
@@ -141,9 +242,5 @@ class FirestoreData extends StatelessWidget {
         );
       },
     );
-  }
-
-  void _showStudentDialog(BuildContext context, DocumentSnapshot student) {
-    (_MainAppState())._showStudentDialog(context, student);
   }
 }
